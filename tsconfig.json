@@ -3,6 +3,7 @@
 		"module": "commonjs",
 		"moduleResolution": "node",
 		"removeComments": true,
+		"declaration": true,
 		"baseUrl": "src",
 		"paths": {"*": ["*"]},
 		"outDir": "dist",

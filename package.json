@@ -6,6 +6,7 @@
 	"bugs": "https://github.com/drovp/save-as-path/issues",
 	"repository": "github:drovp/save-as-path",
 	"main": "dist/index.js",
+  "types": "dist/index.d.ts",
 	"keywords": [
 		"drovp",
 		"util",
