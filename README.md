@@ -80,7 +80,7 @@ Depending on input options, `saveAsPath()` might generate the same file path as 
 In TypeScript, you can import `Options` type and extend your options with it:
 
 ```js
-import {Payload} from '@drovp/types';
+import {PayloadData} from '@drovp/types';
 import {Options as SaveAsOptions} from '@drovp/save-as-path';
 
 type Options = SaveAsOptions & {
