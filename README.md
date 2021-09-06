@@ -1,6 +1,6 @@
 # @drovp/save-as-path
 
-[Drovp](https://drovp.app) utility to determine path for file results. Also comes with options type & schema for your processor profile options.
+[Drovp](https://drovp.app) utility to determine path for file results. Also comes with option schema to easily plugin into your processor's profile options.
 
 ### Supports
 
@@ -28,16 +28,16 @@ module.exports = (plugin) => {
 	plugin.registerProcessor('name', {
 		// ...
 		options: [
-			makeOptionsSchema(),
+			makeOptionSchema(),
 			// ... other options
 		],
 	});
 };
 ```
 
-This will add `saving` property to your profile options.
+This will add `saving` namespace option item to your profile options.
 
-Then in processor, we pass this prop to the `saveAsPath()` util:
+Then in processor, we pass this to the `saveAsPath()` util:
 
 ```js
 // processor.js
@@ -48,20 +48,25 @@ module.exports = async (payload) => {
 	const {item, options} = payload;
 	const destinationExtension = 'jpg';
 	const destinationPath = await saveAsPath(item.path, destinationExtension, options.saving);
+	const tmpPath = `${destinationPath}.tmp${Math.random().toString().slice(-6)}`;
 
-	// Do your stuff, and save the file into `destinationPath`
+	// Do your stuff, and save the file into `tmpPath`
 	// ...
+	await FSP.writeFile(tmpPath, contents);
 
 	// Comply with `deleteOriginal` request to get rid of the input file
 	if (options.saving.deleteOriginal) {
 		await FSP.rm(item.path);
 	}
+
+	// Rename `tmpPath` to `destinationPath` (see IMPORTANT! below)
+	await FSP.rename(tmpPath, destinationPath);
 };
 ```
 
 ### IMPORTANT!
 
-Depending on input options, `saveAsPath()` might generate the same file path as the original file, which might cause issues during processing, saving, or deleting when not accounted for. The best practice is to:
+Depending on input options, `saveAsPath()` can generate the same file path as the original file, which might cause issues during processing, saving, or deleting when not accounted for. The best practice is to:
 
 1. Use `saveAsPath()` to get the destination path.
     ```js
@@ -69,7 +74,7 @@ Depending on input options, `saveAsPath()` might generate the same file path as 
     ```
 1. Make a temporary path out of it:
     ```js
-    const tmpPath = `${destinationPath}.tmp${Math.random().toString().slice(-5)}`;
+    const tmpPath = `${destinationPath}.tmp${Math.random().toString().slice(-6)}`;
     ```
 1. Process and save the new file into `tmpPath`.
 1. If `options.deleteOriginal` is true, delete the original file.
@@ -90,7 +95,7 @@ type Options = SaveAsOptions & {
 
 export type Payload = PayloadData<Options>;
 
-// ... rest of the main file config
+// ... rest of the main file
 ```
 
 ## API
@@ -104,7 +109,7 @@ Options data type the `makeOptionSchema()` will produce on your options object:
 ```ts
 interface Options {
 	saving: {
-		destination: string; // Destination template
+		destination: string;
 		deleteOriginal: boolean;
 		overwriteDestination: boolean;
 		incrementer: 'space' | 'dash' | 'underscore' | 'parentheses';
@@ -114,7 +119,7 @@ interface Options {
 
 ### `makeOptionSchema(options: MakeOptionSchemaOptions): OptionNamespace`
 
-A function to construct `saving` option namespace item to be passed directly to your processor options schema array. Example:
+A function to construct `saving` namespace option item schema. Example:
 
 ```js
 plugin.registerProcessor('foo', {
@@ -136,13 +141,13 @@ interface MakeOptionSchemaOptions {
 ##### `extraTokens`
 
 An object map with extra token names and their descriptions if you are using any.
-This will be displayed in the custom destination template description so that users know these tokens are available.
+They'll be listed in the destination template description so that users know these tokens are available.
 
 Example:
 
 ```js
 makeOptionsSchema({
-	// used by @drovp/image-optimizer
+	// As used in @drovp/image-optimizer
 	encoder: `name of the encoder used to compress the file`,
 });
 ```
@@ -159,13 +164,13 @@ const destinationPath = await saveAsPath(payload.item.path, 'webp', payload.opti
 
 Type: `string` _required_
 
-Path to the original file which we are trying to either replace, or create a new one out of.
+Path to the original file which we are going to process.
 
 #### `newExtension`
 
 Type: `string` _required_
 
-An extension the new file should have. Can be same as the original.
+The extension the new file should have. Can be same as the original.
 
 #### `options`
 
@@ -173,15 +178,35 @@ Type: `SaveAsPathOptions` _required_
 
 ```ts
 interface SaveAsPathOptions {
+	destination?: string;
 	deleteOriginal?: boolean;
 	overwriteDestination?: boolean;
 	incrementer?: 'space' | 'dash' | 'underscore' | 'parentheses';
-	destination?: string;
 	tokenReplacer?: (name: string) => string | number | null | undefined | Promise<string | number | null | undefined>;
 }
 ```
 
 All options except the `tokenReplacer` are provided by the `saving` option schema. The `tokenReplacer` is for you if you wish to provide extra tokens for replacement.
+
+##### `destination`
+
+Type: `string`
+Default: `'<basename>'`
+
+A desired destination template. Currently supports these tokens:
+
+-   `<tmp>`, `<home>`, `<downloads>`, `<documents>`, `<pictures>`, `<music>`, `<videos>`, `<desktop>` - platform folders
+-   `<basename>` - **result** file basename `/foo/bar.jpg` → `bar.jpg`
+-   `<filename>` - file name without the extension `/foo/bar.jpg` → `bar`
+-   `<extname>` - **result** file extension with the dot `/foo/bar.jpg` → `.jpg`
+-   `<ext>` - **result** file extension without the dot `/foo/bar.jpg` → `jpg`
+-   `<dirname>` - directory path `/foo/bar/baz.jpg` → `/foo/bar`
+-   `<dirbasename>` - name of a parent directory `/foo/bar/baz.jpg` → `bar`
+-   `<srcBasename>` - **original** file basename `/foo/bar.jpg` → `bar.jpg`
+-   `<srcExtname>` - **original** file extension with the dot `/foo/bar.jpg` → `.jpg`
+-   `<srcExt>` - **original** file extension without the dot `/foo/bar.jpg` → `jpg`
+
+You can add more tokens with `tokenReplacer` option below.
 
 ##### `deleteOriginal`
 
@@ -190,14 +215,18 @@ Default: `false`
 
 Wether to delete the original file. The `saveAsPath()` **DOESN'T** delete any files, it will only generate a result file path that will comply with this requirement.
 
-You have to delete the original file manually yourself after you've processed and saved the new file. See the **IMPORTANT!** section above.
+You have to delete the original file manually yourself after you've processed and saved the new file. See the **IMPORTANT!** note in the **Usage** section above.
 
 ##### `overwriteDestination`
 
 Type: `boolean`
 Default: `false`
 
-Specifies wether the new path is allowed to overwrite existing files. When enabled, it'll ignore if any file exists on the requested destination, UNLESS the `deleteOriginal` options is **disabled**, then it'll check if the destination matches the original, and if so, it'll increment it's filename by 1, ensuring the original is **not** deleted.
+Specifies wether the new path is allowed to overwrite existing files.
+
+When enabled, it'll ignore if any file exists on the requested destination, UNLESS the `deleteOriginal` options is **disabled**, then it'll ensuring the original is **not** deleted.
+
+When disabled, filename will be incremented until there's no conflict, UNLESS the `deleteOriginal` options is **enabled** and the desired result path matches the original, in which case the result path will not be increment, and will allow the original to be overwritten.
 
 ##### `incrementer`
 
@@ -208,7 +237,28 @@ Filename incrementation style. When there is already a file on requested destina
 
 Styles:
 
-- `space` - `file.jpg` -> `file 1.jpg`
-- `dash` - `file.jpg` -> `file-1.jpg`
-- `underscore` - `file.jpg` -> `file_1.jpg`
-- `parentheses` - `file.jpg` -> `file (1).jpg`
+-   **space**: `file.jpg` -> `file 1.jpg`
+-   **dash**: `file.jpg` -> `file-1.jpg`
+-   **underscore**: `file.jpg` -> `file_1.jpg`
+-   **parentheses**: `file.jpg` -> `file (1).jpg`
+
+##### `tokenReplacer`
+
+Type: `(name: string) => string | number | null | undefined | Promise<string | number | null | undefined>`
+
+Allows providing your own custom destination template tokens. Accepts token name (without the `<>` characters), and should return a string or a number.
+
+Returning `null | undefined` is recognized as non-existent token, and results in an _Unknown token_ error.
+
+Can be async.
+
+Example:
+
+```js
+const destinationPath = await saveAsPath(item.path, 'jpg', {
+	...options.saving,
+	tokenReplacer: (name) => {
+		if (name === 'myCustomToken') return 'token value';
+	},
+});
+```
