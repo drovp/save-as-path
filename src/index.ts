@@ -94,7 +94,7 @@ export function makeOptionSchema({extraTokens = {}}: MakeOptionSchemaOptions = {
 				default: 'space',
 				title: `Increment style`,
 				description: `What filename incrementation style to use when destination can't be overwritten.`,
-				isHidden: (_: string, {saving}: Options) => !(saving.deleteOriginal && saving.overwriteDestination),
+				isHidden: (_: string, {saving}: Options) => saving.deleteOriginal && saving.overwriteDestination,
 			},
 		],
 	};
