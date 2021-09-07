@@ -116,6 +116,12 @@ const incrementers: Record<string, Incrementer | undefined> = {
 	parentheses: undefined,
 };
 
+export class UnknownTokenError extends Error {
+	constructor(tokenName: string) {
+		super(`Unknown token "${tokenName}".`);
+	}
+}
+
 /**
  * Save as path.
  *
@@ -133,7 +139,7 @@ export async function saveAsPath(
 		tokenEnd = '>',
 		tokenChars = '[a-zA-Z0-9]+',
 		tokenReplacer,
-	}: SaveAsPathOptions
+	}: SaveAsPathOptions = {}
 ) {
 	const dirname = Path.dirname(originalPath);
 	const srcExtname = Path.extname(originalPath);
@@ -165,7 +171,7 @@ export async function saveAsPath(
 					const value = await tokenReplacer(name);
 					if (value != null) return value;
 				}
-				throw new Error(`Unknown token "${match[0]}".`);
+				throw new UnknownTokenError(match[0]!);
 			},
 		],
 		[regexpReplace(tokenStart), tokenStart],
