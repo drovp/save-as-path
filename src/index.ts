@@ -8,10 +8,10 @@ import {unusedFilename, separatorIncrementer, Incrementer, isSamePath, escapeHtm
  */
 
 export interface SaveAsPathOptions {
-	destination: string;
-	deleteOriginal: boolean;
-	overwriteDestination: boolean;
-	incrementer: 'space' | 'dash' | 'underscore' | 'parentheses';
+	destination?: string;
+	deleteOriginal?: boolean;
+	overwriteDestination?: boolean;
+	incrementer?: 'space' | 'dash' | 'underscore' | 'parentheses';
 	tokenStart?: string;
 	tokenEnd?: string;
 	tokenChars?: string;
