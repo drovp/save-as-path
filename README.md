@@ -123,7 +123,7 @@ A function to construct `saving` namespace option item schema. Example:
 
 ```js
 plugin.registerProcessor('foo', {
-	options: [makeOptionsSchema() /* other options */],
+	options: [makeOptionsSchema(), /* other options */],
 	// ...
 });
 ```
@@ -173,7 +173,7 @@ const destinationPath = await saveAsPath(payload.item.path, 'webp', payload.opti
 
 Type: `string` _required_
 
-Path to the original file which we are going to process.
+Path to the original file to be processed.
 
 #### `newExtension`
 
@@ -205,7 +205,9 @@ Options `destination`, `deleteOriginal`, `overwriteDestination`, and `incremente
 Type: `string`
 Default: `'<basename>'`
 
-A desired destination template. Currently supports these tokens:
+A desired destination template. Relative paths resolve from the original path's dirname.
+
+Currently supports these tokens:
 
 -   `<tmp>`, `<home>`, `<downloads>`, `<documents>`, `<pictures>`, `<music>`, `<videos>`, `<desktop>` - platform folders
 -   `<basename>` - **result** file basename `/foo/bar.jpg` → `bar.jpg`
