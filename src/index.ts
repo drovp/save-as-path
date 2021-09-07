@@ -159,7 +159,6 @@ export async function saveAsPath(
 			new RegExp(`${regexpReplace(tokenStart)}(?<name>${tokenChars})${regexpReplace(tokenEnd)}`),
 			async (_, match) => {
 				const name = match.groups?.name as string;
-				console.log(name, pathParts[name]);
 				if (pathParts.hasOwnProperty(name)) return pathParts[name] || '';
 				if (isPlatformPathIdentifier(name)) return await platformPaths[name]({maxAge: Infinity});
 				if (tokenReplacer) {
