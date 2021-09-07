@@ -1,7 +1,6 @@
 import * as Path from 'path';
 import {promises as FSP} from 'fs';
 
-
 /**
  * Helpers.
  */
@@ -23,8 +22,8 @@ export function isSamePath(pathA: string, pathB: string) {
 export function escapeHtml(unsafe: string) {
 	return unsafe
 		.replace(/&/g, '&amp;')
-		.replace(/</g, '${tokenStart}')
-		.replace(/>/g, '${tokenEnd}')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
 		.replace(/"/g, '&quot;')
 		.replace(/'/g, '&#039;');
 }
