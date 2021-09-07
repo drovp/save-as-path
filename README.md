@@ -1,14 +1,14 @@
 # @drovp/save-as-path
 
-[Drovp](https://drovp.app) utility to determine path for file results. Also comes with option schema to easily plugin into your processor's profile options.
+[Drovp](https://drovp.app) utility to determine destination path for file results. Also comes with option schema to easily plugin into your processor's profile options.
 
-### Supports
+### Features
 
-Destination path template with a lot of predefined tokens such as all of the file path parts like `<basename>`, `<filename>`, `<extension>`, ... as well as common platform directory paths like `<downloads>`, `<documents>`, `<pictures>`, ...
+Destination path template option with a lot of available replacement tokens, such as all of the file path parts like `<basename>`, `<filename>`, `<extension>`, ... as well as common platform directory paths like `<downloads>`, `<documents>`, `<pictures>`, ...
 
-Separate options to **Delete original** file and **Overwrite destination** (if it's a different file than original), so that the saving destination is generated exactly to user's needs.
+Separate options to **Delete original** file and **Overwrite destination** (only or even if it's a different file than original), so that the saving destination is generated exactly to user's needs.
 
-Multiple filename incrementation styles for when the desired destination exists and user configuration says it can't be overwritten.
+Configurable filename incrementation style for when the desired destination already exists, but the user configuration says it can't be overwritten.
 
 ## Install
 
@@ -135,6 +135,8 @@ Exported as `MakeOptionSchemaOptions`.
 ```ts
 interface MakeOptionSchemaOptions {
 	extraTokens?: Record<string, string>;
+	tokenStart?: string;
+	tokenEnd?: string;
 }
 ```
 
@@ -151,6 +153,13 @@ makeOptionsSchema({
 	encoder: `name of the encoder used to compress the file`,
 });
 ```
+
+##### `tokenStart` & `tokenEnd`
+
+Type: `string`
+Default: `<` & `>`
+
+Token start and end terminating characters. If you're customizing these when calling `saveAsPath()`, pass them here as well so that it can be reflected in option descriptions as well.
 
 ### `saveAsPath(originalPath: string, newExtension: string, options: SaveAsPathOptions): Promise<string>`
 
@@ -182,11 +191,14 @@ interface SaveAsPathOptions {
 	deleteOriginal?: boolean;
 	overwriteDestination?: boolean;
 	incrementer?: 'space' | 'dash' | 'underscore' | 'parentheses';
+	tokenStart?: string;
+	tokenEnd?: string;
+	tokenChars?: string;
 	tokenReplacer?: (name: string) => string | number | null | undefined | Promise<string | number | null | undefined>;
 }
 ```
 
-All options except the `tokenReplacer` are provided by the `saving` option schema. The `tokenReplacer` is for you if you wish to provide extra tokens for replacement.
+Options `destination`, `deleteOriginal`, `overwriteDestination`, and `incrementer` are provided by the `saving` option schema. The rest is for you to customize tokens, or add more of them with `tokenReplacer`.
 
 ##### `destination`
 
@@ -242,13 +254,29 @@ Styles:
 -   **underscore**: `file.jpg` -> `file_1.jpg`
 -   **parentheses**: `file.jpg` -> `file (1).jpg`
 
+##### `tokenStart` & `tokenEnd`
+
+Type: `string`
+Default: `<` & `>`
+
+Token start and end terminating characters.
+
+You _can_ also just disable the `tokenEnd` by passing an empty string, and set the `tokenStart` to `:` to have tokens such as `:name`, but that is prone to conflicts.
+
+##### `tokenChars`
+
+Type: `string`
+Default: `[a-zA-Z0-9]+`
+
+A regexp string that should match token name.
+
 ##### `tokenReplacer`
 
 Type: `(name: string) => string | number | null | undefined | Promise<string | number | null | undefined>`
 
-Allows providing your own custom destination template tokens. Accepts token name (without the `<>` characters), and should return a string or a number.
+Allows providing your own custom destination template tokens. Accepts a token name (without the `<>` characters), and should return a string or a number.
 
-Returning `null | undefined` is recognized as non-existent token, and results in an _Unknown token_ error.
+Returning `null | undefined` is recognized as non-existent token, and results in an _Unknown token_ operation error.
 
 Can be async.
 

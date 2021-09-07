@@ -1,20 +1,20 @@
 import * as Path from 'path';
-import unusedFilename, {separatorIncrementer, Incrementer} from 'unused-filename';
-import {detokenizeAsync} from 'detokenizer';
+import {detokenizeAsync, ValuesArrayAsync} from 'detokenizer';
 import {platformPaths, isPlatformPathIdentifier} from 'platform-paths';
+import {unusedFilename, separatorIncrementer, Incrementer, isSamePath, escapeHtml, regexpReplace} from './utils';
 
 /**
  * Types.
  */
 
 export interface SaveAsPathOptions {
+	destination: string;
 	deleteOriginal: boolean;
 	overwriteDestination: boolean;
 	incrementer: 'space' | 'dash' | 'underscore' | 'parentheses';
-	destination: string;
 	tokenStart?: string;
 	tokenEnd?: string;
-	maxTries?: number;
+	tokenChars?: string;
 	tokenReplacer?: (name: string) => string | number | null | undefined | Promise<string | number | null | undefined>;
 }
 
@@ -30,12 +30,21 @@ export interface Options {
 
 export interface MakeOptionSchemaOptions {
 	extraTokens?: Record<string, string>;
+	tokenStart?: string;
+	tokenEnd?: string;
 }
 
 /**
  * Drovp option schema maker.
  */
-export function makeOptionSchema({extraTokens = {}}: MakeOptionSchemaOptions = {}): any {
+export function makeOptionSchema({
+	extraTokens = {},
+	tokenStart = '<',
+	tokenEnd = '>',
+}: MakeOptionSchemaOptions = {}): any {
+	tokenStart = escapeHtml(tokenStart);
+	tokenEnd = escapeHtml(tokenEnd);
+
 	return {
 		name: 'saving',
 		type: 'namespace',
@@ -50,18 +59,18 @@ export function makeOptionSchema({extraTokens = {}}: MakeOptionSchemaOptions = {
 				<p>Where to save the file. Relative path starts at the input file's directory.</p>
 				<p><b>Available tokens:</b></p>
 				<p>
-					Platform folders: <code>&lt;tmp&gt;</code>, <code>&lt;home&gt;</code>, <code>&lt;downloads&gt;</code>, <code>&lt;documents&gt;</code>, <code>&lt;pictures&gt;</code>, <code>&lt;music&gt;</code>, <code>&lt;videos&gt;</code>, <code>&lt;desktop&gt;</code><br>
-					<code>&lt;basename&gt;</code> - <b>result</b> file basename <code>/foo/bar.jpg</code> → <code>bar.jpg</code><br>
-					<code>&lt;filename&gt;</code> - file name without the extension <code>/foo/bar.jpg</code> → <code>bar</code><br>
-					<code>&lt;extname&gt;</code> - <b>result</b> file extension with the dot <code>/foo/bar.jpg</code> → <code>.jpg</code><br>
-					<code>&lt;ext&gt;</code> - <b>result</b> file extension without the dot <code>/foo/bar.jpg</code> → <code>jpg</code><br>
-					<code>&lt;dirname&gt;</code> - directory path <code>/foo/bar/baz.jpg</code> → <code>/foo/bar</code><br>
-					<code>&lt;dirbasename&gt;</code> - name of a parent directory <code>/foo/bar/baz.jpg</code> → <code>bar</code><br>
-					<code>&lt;srcBasename&gt;</code> - <b>original</b> file basename <code>/foo/bar.jpg</code> → <code>bar.jpg</code><br>
-					<code>&lt;srcExtname&gt;</code> - <b>original</b> file extension with the dot <code>/foo/bar.jpg</code> → <code>.jpg</code><br>
-					<code>&lt;srcExt&gt;</code> - <b>original</b> file extension without the dot <code>/foo/bar.jpg</code> → <code>jpg</code><br>
+					Platform folders: <code>${tokenStart}tmp${tokenEnd}</code>, <code>${tokenStart}home${tokenEnd}</code>, <code>${tokenStart}downloads${tokenEnd}</code>, <code>${tokenStart}documents${tokenEnd}</code>, <code>${tokenStart}pictures${tokenEnd}</code>, <code>${tokenStart}music${tokenEnd}</code>, <code>${tokenStart}videos${tokenEnd}</code>, <code>${tokenStart}desktop${tokenEnd}</code><br>
+					<code>${tokenStart}basename${tokenEnd}</code> - <b>result</b> file basename <code>/foo/bar.jpg</code> → <code>bar.jpg</code><br>
+					<code>${tokenStart}filename${tokenEnd}</code> - file name without the extension <code>/foo/bar.jpg</code> → <code>bar</code><br>
+					<code>${tokenStart}extname${tokenEnd}</code> - <b>result</b> file extension with the dot <code>/foo/bar.jpg</code> → <code>.jpg</code><br>
+					<code>${tokenStart}ext${tokenEnd}</code> - <b>result</b> file extension without the dot <code>/foo/bar.jpg</code> → <code>jpg</code><br>
+					<code>${tokenStart}dirname${tokenEnd}</code> - directory path <code>/foo/bar/baz.jpg</code> → <code>/foo/bar</code><br>
+					<code>${tokenStart}dirbasename${tokenEnd}</code> - name of a parent directory <code>/foo/bar/baz.jpg</code> → <code>bar</code><br>
+					<code>${tokenStart}srcBasename${tokenEnd}</code> - <b>original</b> file basename <code>/foo/bar.jpg</code> → <code>bar.jpg</code><br>
+					<code>${tokenStart}srcExtname${tokenEnd}</code> - <b>original</b> file extension with the dot <code>/foo/bar.jpg</code> → <code>.jpg</code><br>
+					<code>${tokenStart}srcExt${tokenEnd}</code> - <b>original</b> file extension without the dot <code>/foo/bar.jpg</code> → <code>jpg</code><br>
 					${Object.entries(extraTokens)
-						.map(([name, description]) => `<code>&lt;${name}&gt;</code> - ${description}`)
+						.map(([name, description]) => `<code>${tokenStart}${name}${tokenEnd}</code> - ${description}`)
 						.join('<br>')}
 				</p>`,
 			},
@@ -100,10 +109,6 @@ export function makeOptionSchema({extraTokens = {}}: MakeOptionSchemaOptions = {
 	};
 }
 
-/**
- * Helpers.
- */
-
 const incrementers: Record<string, Incrementer | undefined> = {
 	space: separatorIncrementer(' '),
 	dash: separatorIncrementer('-'),
@@ -111,26 +116,11 @@ const incrementers: Record<string, Incrementer | undefined> = {
 	parentheses: undefined,
 };
 
-function normalizePath(path: string) {
-	return Path.normalize(path.trim().replace(/[\\\/]+$/, ''));
-}
-
-const isWindows = process.platform === 'win32';
-
-function isSamePath(pathA: string, pathB: string) {
-	if (isWindows) {
-		pathA = pathA.toLowerCase();
-		pathB = pathB.toLowerCase();
-	}
-	return normalizePath(pathA) === normalizePath(pathB);
-}
-
 /**
  * Save as path.
  *
  * Accepts options generated by options schema above.
  */
-
 export async function saveAsPath(
 	originalPath: string,
 	extension: string,
@@ -141,7 +131,7 @@ export async function saveAsPath(
 		destination = '<basename>',
 		tokenStart = '<',
 		tokenEnd = '>',
-		maxTries = 9999,
+		tokenChars = '[a-zA-Z0-9]+',
 		tokenReplacer,
 	}: SaveAsPathOptions
 ) {
@@ -164,9 +154,9 @@ export async function saveAsPath(
 		dirbasename: Path.basename(dirname),
 	};
 
-	let destinationPath = await detokenizeAsync(destination, [
+	const replacers: ValuesArrayAsync = [
 		[
-			new RegExp(`\\${tokenStart}(?<name>[^\\${tokenEnd}]+)${tokenEnd}`),
+			new RegExp(`${regexpReplace(tokenStart)}(?<name>${tokenChars})${regexpReplace(tokenEnd)}`),
 			async (_, match) => {
 				const name = match.groups?.name as string;
 				console.log(name, pathParts[name]);
@@ -179,9 +169,12 @@ export async function saveAsPath(
 				throw new Error(`Unknown token "${match[0]}".`);
 			},
 		],
-		[`\\${tokenStart}`, tokenStart],
-		[`\\${tokenEnd}`, tokenEnd],
-	]);
+		[regexpReplace(tokenStart), tokenStart],
+	];
+
+	if (tokenEnd) replacers.push([regexpReplace(tokenEnd), tokenEnd]);
+
+	let destinationPath = await detokenizeAsync(destination, replacers);
 
 	destinationPath = Path.resolve(dirname, destinationPath);
 
@@ -189,16 +182,16 @@ export async function saveAsPath(
 
 	if (deleteOriginal) {
 		if (!overwriteDestination && !samePath) {
-			destinationPath = await unusedFilename(destinationPath, {incrementer, maxTries});
+			destinationPath = await unusedFilename(destinationPath, {incrementer});
 		}
-	} else {
-		destinationPath =
-			!samePath && overwriteDestination
-				? destinationPath
-				: await unusedFilename(destinationPath, {
-						incrementer,
-						maxTries: samePath && overwriteDestination ? 1 : maxTries,
-				  });
+	} else if (samePath || !overwriteDestination) {
+		const singleTry = samePath && overwriteDestination;
+
+		destinationPath = await unusedFilename(destinationPath, {
+			incrementer,
+			maxTries: singleTry ? 1 : undefined,
+			throwOnMaxTries: !singleTry,
+		});
 	}
 
 	return destinationPath;
