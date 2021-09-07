@@ -1,6 +1,6 @@
 {
 	"name": "@drovp/save-as-path",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"description": "Drovp utility to determine path for file results.",
 	"homepage": "https://github.com/drovp/save-as-path",
 	"bugs": "https://github.com/drovp/save-as-path/issues",
