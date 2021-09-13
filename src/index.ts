@@ -77,14 +77,14 @@ export function makeOptionSchema({
 			{
 				name: 'deleteOriginal',
 				type: 'boolean',
-				default: true,
+				default: false,
 				title: `Delete original`,
 				description: `Ensures the original file is deleted.`,
 			},
 			{
 				name: 'overwriteDestination',
 				type: 'boolean',
-				default: true,
+				default: false,
 				title: `Overwrite destination`,
 				description: (value: boolean, {saving}: Options) =>
 					saving.deleteOriginal
