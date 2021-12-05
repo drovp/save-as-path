@@ -1,7 +1,11 @@
 import * as Path from 'path';
-import {detokenizeAsync, ValuesArrayAsync} from 'detokenizer';
-import {platformPaths, isPlatformPathIdentifier} from 'platform-paths';
-import {unusedFilename, separatorIncrementer, Incrementer, isSamePath, escapeHtml, regexpReplace} from './utils';
+import {expandTemplateLiteral} from 'expand-template-literal';
+import {platformPaths} from 'platform-paths';
+import unusedFilename, {separatorIncrementer, Incrementer, MaxTryError} from 'unused-filename';
+import {checksumFile} from '@tomasklaen/checksum';
+import * as dayjs from 'dayjs';
+
+export {TemplateError} from 'expand-template-literal';
 
 /**
  * Types.
@@ -12,10 +16,8 @@ export interface SaveAsPathOptions {
 	deleteOriginal?: boolean;
 	overwriteDestination?: boolean;
 	incrementer?: 'space' | 'dash' | 'underscore' | 'parentheses';
-	tokenStart?: string;
-	tokenEnd?: string;
-	tokenChars?: string;
-	tokenReplacer?: (name: string) => string | number | null | undefined | Promise<string | number | null | undefined>;
+	extraVariables?: Record<string, any>;
+	outputPath?: string;
 }
 
 export interface Options {
@@ -29,21 +31,27 @@ export interface Options {
 }
 
 export interface MakeOptionSchemaOptions {
-	extraTokens?: Record<string, string>;
-	tokenStart?: string;
-	tokenEnd?: string;
+	showChecksums?: boolean;
+	extraVariables?: Record<string, string>;
 }
+
+const incrementers: Record<string, Incrementer | undefined> = {
+	space: separatorIncrementer(' '),
+	dash: separatorIncrementer('-'),
+	underscore: separatorIncrementer('_'),
+	parentheses: undefined,
+};
 
 /**
  * Drovp option schema maker.
  */
-export function makeOptionSchema({
-	extraTokens = {},
-	tokenStart = '<',
-	tokenEnd = '>',
-}: MakeOptionSchemaOptions = {}): any {
-	tokenStart = escapeHtml(tokenStart);
-	tokenEnd = escapeHtml(tokenEnd);
+export function makeOptionSchema({showChecksums, extraVariables = {}}: MakeOptionSchemaOptions = {}): any {
+	const checksumDescriptions = showChecksums
+		? `
+		<b><code>\${crc32/md5/sha1/sha256/sha512}</code></b> - <b>output</b> file checksums<br>
+		<b><code>\${CRC32/MD5/SHA1/SHA256/SHA512}</code></b> - uppercase <b>output</b> file checksums<br>
+	`
+		: '';
 
 	return {
 		name: 'saving',
@@ -53,26 +61,38 @@ export function makeOptionSchema({
 				name: 'destination',
 				type: 'path',
 				kind: 'directory',
-				default: '<basename>',
+				default: '${basename}',
 				title: `Destination`,
 				description: `
-				<p>Where to save the file. Relative path starts at the input file's directory.</p>
-				<p><b>Available tokens:</b></p>
+				<p>Where to save the file. Relative path starts at the input file's directory. Template is a JavaScript template literal allowing embedded expressions.</p>
+				<p><b>Available variables:</b></p>
+				<p><em>Examples assume an input path <code>/foo/bar/baz.png</code>, and an output type <code>jpg</code>.</em></p>
 				<p>
-					Platform folders: <code>${tokenStart}tmp${tokenEnd}</code>, <code>${tokenStart}home${tokenEnd}</code>, <code>${tokenStart}downloads${tokenEnd}</code>, <code>${tokenStart}documents${tokenEnd}</code>, <code>${tokenStart}pictures${tokenEnd}</code>, <code>${tokenStart}music${tokenEnd}</code>, <code>${tokenStart}videos${tokenEnd}</code>, <code>${tokenStart}desktop${tokenEnd}</code><br>
-					<code>${tokenStart}basename${tokenEnd}</code> - <b>result</b> file basename <code>/foo/bar.jpg</code> → <code>bar.jpg</code><br>
-					<code>${tokenStart}filename${tokenEnd}</code> - file name without the extension <code>/foo/bar.jpg</code> → <code>bar</code><br>
-					<code>${tokenStart}extname${tokenEnd}</code> - <b>result</b> file extension with the dot <code>/foo/bar.jpg</code> → <code>.jpg</code><br>
-					<code>${tokenStart}ext${tokenEnd}</code> - <b>result</b> file extension without the dot <code>/foo/bar.jpg</code> → <code>jpg</code><br>
-					<code>${tokenStart}dirname${tokenEnd}</code> - directory path <code>/foo/bar/baz.jpg</code> → <code>/foo/bar</code><br>
-					<code>${tokenStart}dirbasename${tokenEnd}</code> - name of a parent directory <code>/foo/bar/baz.jpg</code> → <code>bar</code><br>
-					<code>${tokenStart}srcBasename${tokenEnd}</code> - <b>original</b> file basename <code>/foo/bar.jpg</code> → <code>bar.jpg</code><br>
-					<code>${tokenStart}srcExtname${tokenEnd}</code> - <b>original</b> file extension with the dot <code>/foo/bar.jpg</code> → <code>.jpg</code><br>
-					<code>${tokenStart}srcExt${tokenEnd}</code> - <b>original</b> file extension without the dot <code>/foo/bar.jpg</code> → <code>jpg</code><br>
-					${Object.entries(extraTokens)
-						.map(([name, description]) => `<code>${tokenStart}${name}${tokenEnd}</code> - ${description}`)
+					<b><code>\${basename}</code></b> - <b>output</b> file basename → <code>baz.jpg</code><br>
+					<b><code>\${filename}</code></b> - file name without the extension → <code>baz</code><br>
+					<b><code>\${extname}</code></b> - <b>output</b> file extension with the dot → <code>.jpg</code><br>
+					<b><code>\${ext}</code></b> - <b>output</b> file extension without the dot → <code>jpg</code><br>
+					<b><code>\${dirname}</code></b> - directory path → <code>/foo/bar</code><br>
+					<b><code>\${dirbasename}</code></b> - name of a parent directory → <code>bar</code><br>
+					${checksumDescriptions}
+					${Object.entries(extraVariables)
+						.map(([name, description]) => `<b><code>\${${name}}</code></b> - ${description}`)
 						.join('<br>')}
-				</p>`,
+				</p>
+				<p>
+					Platform folders: <b><code>\${tmp}</code></b>, <b><code>\${home}</code></b>, <b><code>\${downloads}</code></b>, <b><code>\${documents}</code></b>, <b><code>\${pictures}</code></b>, <b><code>\${music}</code></b>, <b><code>\${videos}</code></b>, <b><code>\${desktop}</code></b>
+				</p>
+				<p><b>Utils:</b></p>
+				<p>
+					<b><code>Path</code></b> - <a href="https://nodejs.org/api/path.html">Node.js' <code>path</code> module</a>.<br>
+					<b><code>time()</code></b> - <a href="https://day.js.org/docs/en/display/format">day.js</a>.<br>
+					<b><code>uid(size? = 10)</code></b> - Unique string generator. Size is optional, default is 10. ${
+						showChecksums
+							? `This is a faster alternative to generating file checksums when uniqueness is all that is desired.`
+							: ''
+					} Example: <code>${uid()}</code><br>
+				</p>
+				`,
 			},
 			{
 				name: 'deleteOriginal',
@@ -109,79 +129,48 @@ export function makeOptionSchema({
 	};
 }
 
-const incrementers: Record<string, Incrementer | undefined> = {
-	space: separatorIncrementer(' '),
-	dash: separatorIncrementer('-'),
-	underscore: separatorIncrementer('_'),
-	parentheses: undefined,
-};
-
-export class UnknownTokenError extends Error {
-	constructor(tokenName: string) {
-		super(`Unknown token "${tokenName}".`);
-	}
-}
-
 /**
  * Save as path.
  *
  * Accepts options generated by options schema above.
  */
-export async function saveAsPath(
-	originalPath: string,
-	extension: string,
-	{
+export async function saveAsPath(originalPath: string, outputExtension: string, options: SaveAsPathOptions = {}) {
+	const {
 		deleteOriginal = false,
 		overwriteDestination = false,
 		incrementer: incrementerName = 'space',
-		destination = '<basename>',
-		tokenStart = '<',
-		tokenEnd = '>',
-		tokenChars = '[a-zA-Z0-9]+',
-		tokenReplacer,
-	}: SaveAsPathOptions = {}
-) {
-	const dirname = Path.dirname(originalPath);
-	const srcExtname = Path.extname(originalPath);
-	const srcBasename = Path.basename(originalPath);
-	const filename = Path.basename(srcBasename, srcExtname);
-	const extname = `.${extension}`;
-	const basename = `${filename}${extname}`;
+		outputPath,
+	} = options;
 	const incrementer = incrementers[incrementerName];
-	const pathParts: Record<string, string> = {
-		srcExtname,
-		srcExt: srcExtname[0] === '.' ? srcExtname.slice(1) : srcExtname,
-		srcBasename,
-		filename,
+	const dirname = Path.dirname(originalPath);
+	const template = options.destination || '${basename}';
+	const extraVariables = options.extraVariables || {};
+
+	// Query needed platform paths
+	for (const name of Object.keys(platformPaths) as (keyof typeof platformPaths)[]) {
+		if (template.includes(name)) extraVariables[name] = await platformPaths[name]();
+	}
+
+	// Query needed platform paths
+	for (const name of Object.keys(platformPaths) as (keyof typeof platformPaths)[]) {
+		if (template.includes(name)) extraVariables[name] = await platformPaths[name]();
+	}
+
+	// Generate checksums used in a template
+	if (outputPath) {
+		const lcTemplate = template.toLowerCase();
+		for (const name of ['crc32', 'md5', 'sha1', 'sha256', 'sha512']) {
+			if (lcTemplate.includes(name)) {
+				const checksum = await checksumFile(outputPath, name);
+				extraVariables[name] = extraVariables[name.toUpperCase()] = checksum;
+			}
+		}
+	}
+
+	let destinationPath = Path.resolve(
 		dirname,
-		ext: extension,
-		extname,
-		basename,
-		dirbasename: Path.basename(dirname),
-	};
-
-	const replacers: ValuesArrayAsync = [
-		[
-			new RegExp(`${regexpReplace(tokenStart)}(?<name>${tokenChars})${regexpReplace(tokenEnd)}`),
-			async (_, match) => {
-				const name = match.groups?.name as string;
-				if (pathParts.hasOwnProperty(name)) return pathParts[name] || '';
-				if (isPlatformPathIdentifier(name)) return await platformPaths[name]({maxAge: Infinity});
-				if (tokenReplacer) {
-					const value = await tokenReplacer(name);
-					if (value != null) return value;
-				}
-				throw new UnknownTokenError(match[0]!);
-			},
-		],
-		[regexpReplace(tokenStart), tokenStart],
-	];
-
-	if (tokenEnd) replacers.push([regexpReplace(tokenEnd), tokenEnd]);
-
-	let destinationPath = await detokenizeAsync(destination, replacers);
-
-	destinationPath = Path.resolve(dirname, destinationPath);
+		expandTemplate(originalPath, outputExtension, {...options, destination: template, extraVariables})
+	);
 
 	const samePath = isSamePath(destinationPath, originalPath);
 
@@ -192,12 +181,94 @@ export async function saveAsPath(
 	} else if (samePath || !overwriteDestination) {
 		const singleTry = samePath && overwriteDestination;
 
-		destinationPath = await unusedFilename(destinationPath, {
-			incrementer,
-			maxTries: singleTry ? 1 : undefined,
-			throwOnMaxTries: !singleTry,
-		});
+		try {
+			destinationPath = await unusedFilename(destinationPath, {
+				incrementer,
+				maxTries: singleTry ? 1 : undefined,
+			});
+		} catch (error) {
+			if (error instanceof MaxTryError && singleTry) {
+				destinationPath = error.lastTriedPath;
+			} else {
+				throw error;
+			}
+		}
 	}
 
 	return destinationPath;
 }
+
+/**
+ * Checks wether saving options template is valid (has no errors).
+ *
+ * Returns `true` when valid, or throws with an error of what's wrong.
+ */
+export function checkTemplate({destination = '${basename}', extraVariables}: SaveAsPathOptions): true {
+	const stubs = 'tmp,home,downloads,documents,pictures,music,videos,desktop,crc32,md5,sha1,sha256,sha512'
+		.split(',')
+		.reduce((stubs, name) => {
+			stubs[name] = `{${name}}`;
+			return stubs;
+		}, {} as Record<string, string>);
+	expandTemplate('/mock/path/to/file.png', 'jpg', {destination, extraVariables: {...extraVariables, ...stubs}});
+	return true;
+}
+
+/**
+ * Helpers.
+ */
+
+function expandTemplate(
+	originalPath: string,
+	outputExtension: string,
+	{
+		destination = '${basename}',
+		extraVariables,
+	}: Required<Pick<SaveAsPathOptions, 'destination'>> & Pick<SaveAsPathOptions, 'extraVariables'>
+) {
+	const dirname = Path.dirname(originalPath);
+	const srcextname = Path.extname(originalPath);
+	const srcbasename = Path.basename(originalPath);
+	const filename = Path.basename(srcbasename, srcextname);
+	const extname = `.${outputExtension}`;
+	const basename = `${filename}${extname}`;
+	const variables: Record<string, any> = {
+		path: Path.join(dirname, basename),
+		srcextname,
+		srcext: srcextname[0] === '.' ? srcextname.slice(1) : srcextname,
+		srcbasename,
+		filename,
+		dirname,
+		ext: outputExtension,
+		extname,
+		basename,
+		dirbasename: Path.basename(dirname),
+		Path,
+		time: dayjs,
+		uid,
+		...extraVariables,
+	};
+
+	// Expand the template
+	return expandTemplateLiteral(destination, variables);
+}
+
+function normalizePath(path: string) {
+	return Path.normalize(path.trim().replace(/[\\\/]+$/, ''));
+}
+
+const isWindows = process.platform === 'win32';
+
+function isSamePath(pathA: string, pathB: string) {
+	if (isWindows) {
+		pathA = pathA.toLowerCase();
+		pathB = pathB.toLowerCase();
+	}
+	return normalizePath(pathA) === normalizePath(pathB);
+}
+
+export const uid = (size = 10) =>
+	Array(size)
+		.fill(0)
+		.map(() => Math.floor(Math.random() * 36).toString(36))
+		.join('');

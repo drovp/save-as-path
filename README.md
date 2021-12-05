@@ -4,7 +4,7 @@
 
 ### Features
 
-Destination path template option with a lot of available replacement tokens, such as all of the file path parts like `<basename>`, `<filename>`, `<extension>`, ... as well as common platform directory paths like `<downloads>`, `<documents>`, `<pictures>`, ...
+Destination as a string template with embedded expressions support (JavaScript template literals), and lot of available variables, such as all of the file path parts like `${basename}`, `${filename}`, `${extension}`, ... as well as common platform folder paths like `${downloads}`, `${documents}`, `${pictures}`, ...
 
 Separate options to **Delete original** file and **Overwrite destination** (only or even if it's a different file than original), so that the saving destination is generated exactly to user's needs.
 
@@ -45,9 +45,9 @@ const {saveAsPath} = require('@drovp/save-as-path');
 const {promises: FSP} = require('fs');
 
 module.exports = async (payload) => {
-	const {item, options} = payload;
+	const {input, options} = payload;
 	const destinationExtension = 'jpg';
-	const destinationPath = await saveAsPath(item.path, destinationExtension, options.saving);
+	const destinationPath = await saveAsPath(input.path, destinationExtension, options.saving);
 	const tmpPath = `${destinationPath}.tmp${Math.random().toString().slice(-6)}`;
 
 	// Do your stuff, and save the file into `tmpPath`
@@ -56,7 +56,7 @@ module.exports = async (payload) => {
 
 	// Comply with `deleteOriginal` request to get rid of the input file
 	if (options.saving.deleteOriginal) {
-		await FSP.rm(item.path);
+		await FSP.rm(input.path);
 	}
 
 	// Rename `tmpPath` to `destinationPath` (see IMPORTANT! below)
@@ -66,7 +66,7 @@ module.exports = async (payload) => {
 
 ### IMPORTANT!
 
-Depending on input options, `saveAsPath()` can generate the same file path as the original file, which might cause issues during processing, saving, or deleting when not accounted for. The best practice is to:
+When `deleteOriginal` is enabled, `saveAsPath()` can generate the same file path as the original file, which might cause issues during processing, saving, or deleting when not accounted for. The best practice is to:
 
 1. Use `saveAsPath()` to get the destination path.
     ```js
@@ -123,7 +123,7 @@ A function to construct `saving` namespace option item schema. Example:
 
 ```js
 plugin.registerProcessor('foo', {
-	options: [makeOptionsSchema(), /* other options */],
+	options: [makeOptionsSchema() /* other options */],
 	// ...
 });
 ```
@@ -134,39 +134,35 @@ Exported as `MakeOptionSchemaOptions`.
 
 ```ts
 interface MakeOptionSchemaOptions {
-	extraTokens?: Record<string, string>;
-	tokenStart?: string;
-	tokenEnd?: string;
+	showChecksums?: boolean;
+	extraVariables?: Record<string, string>;
 }
 ```
 
-##### `extraTokens`
+##### `showChecksums`
 
-An object map with extra token names and their descriptions if you are using any.
+If you are providing `saveAsPath()` with a path to output file so it can generate and make checksums available to the template, enable this option so that the checksums documentation shows up in template description.
+
+##### `extraVariables`
+
+An object map with extra variable names and their descriptions if you are using any.
 They'll be listed in the destination template description so that users know these tokens are available.
 
 Example:
 
 ```js
 makeOptionsSchema({
-	// As used in @drovp/image-optimizer
-	encoder: `name of the encoder used to compress the file`,
+	// As used in @drovp/encode
+	codec: `name of the codec used to encode the file`,
 });
 ```
 
-##### `tokenStart` & `tokenEnd`
-
-Type: `string`
-Default: `<` & `>`
-
-Token start and end terminating characters. If you're customizing these when calling `saveAsPath()`, pass them here as well so that it can be reflected in option descriptions as well.
-
-### `saveAsPath(originalPath: string, newExtension: string, options: SaveAsPathOptions): Promise<string>`
+### `saveAsPath(originalPath: string, outputExtension: string, options: SaveAsPathOptions): Promise<string>`
 
 An async function that determines the final file destination. Example:
 
 ```js
-const destinationPath = await saveAsPath(payload.item.path, 'webp', payload.options.saving);
+const destinationPath = await saveAsPath(payload.input.path, 'webp', payload.options.saving);
 ```
 
 #### `originalPath`
@@ -175,11 +171,11 @@ Type: `string` _required_
 
 Path to the original file to be processed.
 
-#### `newExtension`
+#### `outputExtension`
 
 Type: `string` _required_
 
-The extension the new file should have. Can be same as the original.
+The extension the output file should have. Can be same as the original.
 
 #### `options`
 
@@ -191,36 +187,36 @@ interface SaveAsPathOptions {
 	deleteOriginal?: boolean;
 	overwriteDestination?: boolean;
 	incrementer?: 'space' | 'dash' | 'underscore' | 'parentheses';
-	tokenStart?: string;
-	tokenEnd?: string;
-	tokenChars?: string;
-	tokenReplacer?: (name: string) => string | number | null | undefined | Promise<string | number | null | undefined>;
+	extraVariables?: Record<string, any>;
+	outputPath?: string;
 }
 ```
 
-Options `destination`, `deleteOriginal`, `overwriteDestination`, and `incrementer` are provided by the `saving` option schema. The rest is for you to customize tokens, or add more of them with `tokenReplacer`.
+Options `destination`, `deleteOriginal`, `overwriteDestination`, and `incrementer` are provided by the `saving` option schema.
 
 ##### `destination`
 
 Type: `string`
-Default: `'<basename>'`
+Default: `'${basename}'`
 
 A desired destination template. Relative paths resolve from the original path's dirname.
 
-Currently supports these tokens:
+Currently exposes these variables:
 
--   `<tmp>`, `<home>`, `<downloads>`, `<documents>`, `<pictures>`, `<music>`, `<videos>`, `<desktop>` - platform folders
--   `<basename>` - **result** file basename `/foo/bar.jpg` → `bar.jpg`
--   `<filename>` - file name without the extension `/foo/bar.jpg` → `bar`
--   `<extname>` - **result** file extension with the dot `/foo/bar.jpg` → `.jpg`
--   `<ext>` - **result** file extension without the dot `/foo/bar.jpg` → `jpg`
--   `<dirname>` - directory path `/foo/bar/baz.jpg` → `/foo/bar`
--   `<dirbasename>` - name of a parent directory `/foo/bar/baz.jpg` → `bar`
--   `<srcBasename>` - **original** file basename `/foo/bar.jpg` → `bar.jpg`
--   `<srcExtname>` - **original** file extension with the dot `/foo/bar.jpg` → `.jpg`
--   `<srcExt>` - **original** file extension without the dot `/foo/bar.jpg` → `jpg`
+-   `${basename}` - **result** file basename `/foo/bar.jpg` → `bar.jpg`
+-   `${filename}` - file name without the extension `/foo/bar.jpg` → `bar`
+-   `${extname}` - **result** file extension with the dot `/foo/bar.jpg` → `.jpg`
+-   `${ext}` - **result** file extension without the dot `/foo/bar.jpg` → `jpg`
+-   `${dirname}` - directory path `/foo/bar/baz.jpg` → `/foo/bar`
+-   `${dirbasename}` - name of a parent directory `/foo/bar/baz.jpg` → `bar`
+-   `${srcBasename}` - **original** file basename `/foo/bar.jpg` → `bar.jpg`
+-   `${srcExtname}` - **original** file extension with the dot `/foo/bar.jpg` → `.jpg`
+-   `${srcExt}` - **original** file extension without the dot `/foo/bar.jpg` → `jpg`
+-   Platform folders: `${tmp}`, `${home}`, `${downloads}`, `${documents}`, `${pictures}`, `${music}`, `${videos}`, `${desktop}`
+-   Utilities:
+    -   `Path` - reference to
 
-You can add more tokens with `tokenReplacer` option below.
+You can add more variables with `extraVariables` option below.
 
 ##### `deleteOriginal`
 
@@ -238,16 +234,16 @@ Default: `false`
 
 Specifies wether the new path is allowed to overwrite existing files.
 
-When enabled, it'll ignore if any file exists on the requested destination, UNLESS the `deleteOriginal` options is **disabled**, then it'll ensuring the original is **not** deleted.
+When enabled, it'll ignore if any file exists on the requested destination, UNLESS the `deleteOriginal` options is **disabled**, then it'll ensuring at least the original is **not** deleted.
 
-When disabled, filename will be incremented until there's no conflict, UNLESS the `deleteOriginal` options is **enabled** and the desired result path matches the original, in which case the result path will not be increment, and will allow the original to be overwritten.
+When disabled, filename will be incremented until there's no conflict, UNLESS the `deleteOriginal` options is **enabled** and the desired result path matches the original, in which case the original path will be returned.
 
 ##### `incrementer`
 
 Type: `'space' | 'dash' | 'underscore' | 'parentheses'`
 Default: `space`
 
-Filename incrementation style. When there is already a file on requested destination path, and the configuration states it shouldn't be overwritten, `saveAsPath()` will increment the file name until it satisfies the configuration requirements.
+Filename incrementation style. When there's already a file on a requested destination path, and the configuration states it shouldn't be overwritten, `saveAsPath()` will increment the file name until it satisfies the configuration requirements.
 
 Styles:
 
@@ -256,27 +252,12 @@ Styles:
 -   **underscore**: `file.jpg` -> `file_1.jpg`
 -   **parentheses**: `file.jpg` -> `file (1).jpg`
 
-##### `tokenStart` & `tokenEnd`
+##### `extraVariables`
 
-Type: `string`
-Default: `<` & `>`
+Type: `Record<string, any>` _optional_
 
-Token start and end terminating characters.
-
-You _can_ also just disable the `tokenEnd` by passing an empty string, and set the `tokenStart` to `:` to have tokens such as `:name`, but that is prone to conflicts.
-
-##### `tokenChars`
-
-Type: `string`
-Default: `[a-zA-Z0-9]+`
-
-A regexp string that should match token name.
-
-##### `tokenReplacer`
-
-Type: `(name: string) => string | number | null | undefined | Promise<string | number | null | undefined>`
-
-Allows providing your own custom destination template tokens. Accepts a token name (without the `<>` characters), and should return a string or a number.
+A record of extra variables to make available inside a template. Because templates are JavaScript template literals, this can be anything including utility functions and constructors.
+Allows providing your own custom destination template tokens. Accepts a token name (without the `${}` characters), and should return a string or a number.
 
 Returning `null | undefined` is recognized as non-existent token, and results in an _Unknown token_ operation error.
 
@@ -292,3 +273,31 @@ const destinationPath = await saveAsPath(item.path, 'jpg', {
 	},
 });
 ```
+
+##### `outputPath`
+
+Type: `string` _optional_
+
+If you provide path to the already existing output file for which we are creating the new path for, `saveAsPath()` will be able to provide the template with file checksums as variables.
+
+Checksums will be generated only when template uses them.
+
+When you are passing `outputPath`, it means you are running `saveAsPath()` **after** the file has been generated, in which case it's a good practice to use `checkTemplate()` below to check if a template will produce a path and not error out due to syntax errors or misspelled variables. We don't want to spend 30 minutes encoding a file, and only then error out because template has errors.
+
+Also, don't forget to enable `makeOptionsSchema({showChecksums: true})` so people can see checksums available in template description.
+
+#### Returns
+
+Promise that resolves with desired output file path.
+
+### `checkTemplate(originalPath: string, outputExtension: string, options: SaveAsPathOptions): true`
+
+A **synchronous** function that checks if template in options is
+
+```js
+const destinationPath = await saveAsPath(payload.input.path, 'webp', payload.options.saving);
+```
+
+### TemplateError
+
+Error thrown when template tries to use a non-existent variable, or has syntax or runtime errors.

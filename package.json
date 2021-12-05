@@ -27,9 +27,8 @@
 		"build": "tsc",
 		"watch": "tsc --watch",
 		"clean": "rimraf dist",
-		"start": "npm-run-all clean watch",
+		"start": "ava --watch",
 		"test": "ava",
-		"dev": "ava --watch",
 		"preversion": "npm-run-all clean build",
 		"git-push": "git push",
 		"npm-publish": "npm publish",
@@ -53,7 +52,10 @@
 		"typescript": "^4.5.2"
 	},
 	"dependencies": {
-		"detokenizer": "^1.0.2",
-		"platform-paths": "^1.2.2"
+		"@tomasklaen/checksum": "^1.0.1",
+		"dayjs": "^1.10.7",
+		"expand-template-literal": "^1.0.3",
+		"platform-paths": "^1.2.2",
+		"unused-filename": "^3.0.1"
 	}
 }
