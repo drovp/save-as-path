@@ -1,6 +1,6 @@
 # @drovp/save-as-path
 
-[Drovp](https://drovp.app) utility to determine destination path for file results. Also comes with option schema to easily plugin into your processor's profile options.
+[Drovp](https://drovp.app) plugin utility to determine destination path for file results. Also comes with option schema to easily plugin into your processor's profile options.
 
 ### Features
 
@@ -35,50 +35,43 @@ module.exports = (plugin) => {
 };
 ```
 
-This will add `saving` namespace option item to your profile options.
+This will add `saving` namespace to your profile options, ready to be passed to `saveAsPath()` to handle all the tedious renaming related stuff for you.
 
-Then in processor, we pass this to the `saveAsPath()` util:
+Here's a best practice example of how to use this utility:
 
 ```js
 // processor.js
-const {saveAsPath} = require('@drovp/save-as-path');
+const {saveAsPath, checkSaveAsPathOptions, TemplateError} = require('@drovp/save-as-path');
 const {promises: FSP} = require('fs');
 
-module.exports = async (payload) => {
+module.exports = async (payload, utils) => {
 	const {input, options} = payload;
-	const destinationExtension = 'jpg';
-	const destinationPath = await saveAsPath(input.path, destinationExtension, options.saving);
-	const tmpPath = `${destinationPath}.tmp${Math.random().toString().slice(-6)}`;
+	const outputExtension = 'jpg';
+	const tmpPath = `${input.path}.tmp${Math.random().toString().slice(-6)}`;
 
-	// Do your stuff, and save the file into `tmpPath`
-	// ...
-	await FSP.writeFile(tmpPath, contents);
-
-	// Comply with `deleteOriginal` request to get rid of the input file
-	if (options.saving.deleteOriginal) {
-		await FSP.rm(input.path);
+	// First, we check that options have a valid template.
+	// This is so that invalid options throw an error BEFORE we potentially
+	// spend half an hour creating a new file, and not afterwards.
+	try {
+		checkSaveAsPathOptions(options.saving);
+	} catch (error) {
+		if (error instanceof TemplateError) {
+			utils.output.error(`Destination template error: ${error.message}`);
+			return;
+		}
 	}
 
-	// Rename `tmpPath` to `destinationPath` (see IMPORTANT! below)
-	await FSP.rename(tmpPath, destinationPath);
+	// We create a new file at a unique temporary path
+	await FSP.writeFile(tmpPath, 'new file contents');
+
+	// We let saveAsPath handle deleting the original file (when requested by
+	// options), and renaming the new one.
+	const outputPath = await saveAsPath(input.path, tmpPath, outputExtension, options.saving);
+
+	// We emit a new file
+	utils.output.file(outputPath);
 };
 ```
-
-### IMPORTANT!
-
-When `deleteOriginal` is enabled, `saveAsPath()` can generate the same file path as the original file, which might cause issues during processing, saving, or deleting when not accounted for. The best practice is to:
-
-1. Use `saveAsPath()` to get the destination path.
-    ```js
-    const destinationPath = await saveAsPath(...params);
-    ```
-1. Make a temporary path out of it:
-    ```js
-    const tmpPath = `${destinationPath}.tmp${Math.random().toString().slice(-6)}`;
-    ```
-1. Process and save the new file into `tmpPath`.
-1. If `options.deleteOriginal` is true, delete the original file.
-1. Finally, rename `tmpPath` to `destinationPath`.
 
 ### TypeScript
 
@@ -117,13 +110,16 @@ interface Options {
 }
 ```
 
-### `makeOptionSchema(options: MakeOptionSchemaOptions): OptionNamespace`
+### `makeOptionSchema(options?): OptionNamespace`
 
 A function to construct `saving` namespace option item schema. Example:
 
 ```js
 plugin.registerProcessor('foo', {
-	options: [makeOptionsSchema() /* other options */],
+	options: [
+		makeOptionsSchema(),
+		/* other options */
+	],
 	// ...
 });
 ```
@@ -134,14 +130,9 @@ Exported as `MakeOptionSchemaOptions`.
 
 ```ts
 interface MakeOptionSchemaOptions {
-	showChecksums?: boolean;
 	extraVariables?: Record<string, string>;
 }
 ```
-
-##### `showChecksums`
-
-If you are providing `saveAsPath()` with a path to output file so it can generate and make checksums available to the template, enable this option so that the checksums documentation shows up in template description.
 
 ##### `extraVariables`
 
@@ -152,34 +143,44 @@ Example:
 
 ```js
 makeOptionsSchema({
-	// As used in @drovp/encode
-	codec: `name of the codec used to encode the file`,
+	extraVariables: {
+		// As used in @drovp/encode
+		codec: `name of the codec used to encode the file`,
+	},
 });
 ```
 
-### `saveAsPath(originalPath: string, outputExtension: string, options: SaveAsPathOptions): Promise<string>`
+### `saveAsPath(inputPath, tmpPath, outputExtension, options?): Promise<string>`
 
-An async function that determines the final file destination. Example:
+An async function that determines the final file destination, and handles all the renaming, deleting, or copying between partitions/drives. Example:
 
 ```js
-const destinationPath = await saveAsPath(payload.input.path, 'webp', payload.options.saving);
+const outputPath = await saveAsPath(payload.input.path, 'tmpfile1e44', 'webp', payload.options.saving);
 ```
 
-#### `originalPath`
+#### `inputPath`
 
 Type: `string` _required_
 
-Path to the original file to be processed.
+Path to the original file that has been processed. This path doesn't have to exist anymore, `saveAsPath()` only uses it to extract path related variables to be used in a template.
+
+Though when **deleteOriginal** option is enabled, `saveAsPath()` will ensure it's deleted before renaming or deciding the new file name.
+
+#### `tmpPath`
+
+Type: `string` _required_
+
+Temporary path that holds now finished output file. This is used to generate checksum variables for templates (only when templates need it), and than it'll be renamed according to the template and other saving options.
 
 #### `outputExtension`
 
-Type: `string` _required_
+Type: `string | null | undefined` _required_
 
-The extension the output file should have. Can be same as the original.
+The extension the output file should have. Can be same as the original, or none.
 
 #### `options`
 
-Type: `SaveAsPathOptions` _required_
+Type: `SaveAsPathOptions` _optional_
 
 ```ts
 interface SaveAsPathOptions {
@@ -188,7 +189,6 @@ interface SaveAsPathOptions {
 	overwriteDestination?: boolean;
 	incrementer?: 'space' | 'dash' | 'underscore' | 'parentheses';
 	extraVariables?: Record<string, any>;
-	outputPath?: string;
 }
 ```
 
@@ -203,18 +203,23 @@ A desired destination template. Relative paths resolve from the original path's 
 
 Currently exposes these variables:
 
--   `${basename}` - **result** file basename `/foo/bar.jpg` → `bar.jpg`
--   `${filename}` - file name without the extension `/foo/bar.jpg` → `bar`
--   `${extname}` - **result** file extension with the dot `/foo/bar.jpg` → `.jpg`
--   `${ext}` - **result** file extension without the dot `/foo/bar.jpg` → `jpg`
--   `${dirname}` - directory path `/foo/bar/baz.jpg` → `/foo/bar`
--   `${dirbasename}` - name of a parent directory `/foo/bar/baz.jpg` → `bar`
--   `${srcBasename}` - **original** file basename `/foo/bar.jpg` → `bar.jpg`
--   `${srcExtname}` - **original** file extension with the dot `/foo/bar.jpg` → `.jpg`
--   `${srcExt}` - **original** file extension without the dot `/foo/bar.jpg` → `jpg`
--   Platform folders: `${tmp}`, `${home}`, `${downloads}`, `${documents}`, `${pictures}`, `${music}`, `${videos}`, `${desktop}`
+_Examples assume **inputPath** `/foo/bar/baz.png` and **outputExtension** `jpg`._
+
+-   **`${basename}`** - **result** file basename → `baz.jpg`
+-   **`${filename}`** - file name without the extension → `baz`
+-   **`${extname}`** - **result** file extension with the dot → `.jpg`
+-   **`${ext}`** - **result** file extension without the dot → `jpg`
+-   **`${dirname}`** - directory path → `/foo/bar`
+-   **`${dirbasename}`** - name of a parent directory → `baz`
+-   **`${srcBasename}`** - **original** file basename → `baz.jpg`
+-   **`${srcExtname}`** - **original** file extension with the dot → `.jpg`
+-   **`${srcExt}`** - **original** file extension without the dot → `jpg`
+-   **`${crc32/md5/sha1/sha256/sha512}`** - **output** file checksums
+-   **`${CRC32/MD5/SHA1/SHA256/SHA512}`** - uppercase **output** file checksums
+-   Platform folders: **`${tmp}`**, **`${home}`**, **`${downloads}`**, **`${documents}`**, **`${pictures}`**, **`${music}`**, **`${videos}`**, **`${desktop}`**
 -   Utilities:
-    -   `Path` - reference to
+    -   **`time()`** - [day.js](https://day.js.org/docs/en/display/format) util to help with time. Example: `${time().format('YY')}`
+    -   **`uid(size? = 10)`** - unique string generator, size is optional, default is 10. Example: `${uid()}`
 
 You can add more variables with `extraVariables` option below.
 
@@ -223,9 +228,7 @@ You can add more variables with `extraVariables` option below.
 Type: `boolean`
 Default: `false`
 
-Wether to delete the original file. The `saveAsPath()` **DOESN'T** delete any files, it will only generate a result file path that will comply with this requirement.
-
-You have to delete the original file manually yourself after you've processed and saved the new file. See the **IMPORTANT!** note in the **Usage** section above.
+Wether to delete the original file.
 
 ##### `overwriteDestination`
 
@@ -234,69 +237,73 @@ Default: `false`
 
 Specifies wether the new path is allowed to overwrite existing files.
 
-When enabled, it'll ignore if any file exists on the requested destination, UNLESS the `deleteOriginal` options is **disabled**, then it'll ensuring at least the original is **not** deleted.
+When enabled, it'll overwrite any existing file on the requested destination, UNLESS the `deleteOriginal` options is **disabled**, then it'll ensuring at least the original is **not** deleted.
 
-When disabled, filename will be incremented until there's no conflict, UNLESS the `deleteOriginal` options is **enabled** and the desired result path matches the original, in which case the original path will be returned.
+When disabled, filename will be incremented until there's no conflict, UNLESS the `deleteOriginal` options is **enabled** and the desired result path matches the original, in which case the file will simply replace the original.
 
 ##### `incrementer`
 
 Type: `'space' | 'dash' | 'underscore' | 'parentheses'`
 Default: `space`
 
-Filename incrementation style. When there's already a file on a requested destination path, and the configuration states it shouldn't be overwritten, `saveAsPath()` will increment the file name until it satisfies the configuration requirements.
+Filename incrementation style. When there's already a file on a requested destination path, and the configuration states it shouldn't be overwritten, `saveAsPath()` will increment the filename until it satisfies the configuration requirements.
 
 Styles:
 
--   **space**: `file.jpg` -> `file 1.jpg`
--   **dash**: `file.jpg` -> `file-1.jpg`
--   **underscore**: `file.jpg` -> `file_1.jpg`
--   **parentheses**: `file.jpg` -> `file (1).jpg`
+-   **space** → `file 1.jpg`
+-   **dash** → `file-1.jpg`
+-   **underscore** → `file_1.jpg`
+-   **parentheses** → `file (1).jpg`
 
 ##### `extraVariables`
 
 Type: `Record<string, any>` _optional_
 
-A record of extra variables to make available inside a template. Because templates are JavaScript template literals, this can be anything including utility functions and constructors.
-Allows providing your own custom destination template tokens. Accepts a token name (without the `${}` characters), and should return a string or a number.
+An object with extra variables that should be available in a template. Because templates are JavaScript template literals, this can be anything including utility functions and constructors.
 
-Returning `null | undefined` is recognized as non-existent token, and results in an _Unknown token_ operation error.
-
-Can be async.
-
-Example:
+In this example, template `${foo} ${baz()}` will generate `'bar something else'`:
 
 ```js
-const destinationPath = await saveAsPath(item.path, 'jpg', {
+const outputPath = await saveAsPath(input.path, tmpPath, 'jpg', {
 	...options.saving,
-	tokenReplacer: (name) => {
-		if (name === 'myCustomToken') return 'token value';
+	extraVariables: {
+		foo: 'bar',
+		baz: () => 'something else',
 	},
 });
 ```
 
-##### `outputPath`
+#### Returns
 
-Type: `string` _optional_
+Promise that resolves with output file path.
 
-If you provide path to the already existing output file for which we are creating the new path for, `saveAsPath()` will be able to provide the template with file checksums as variables.
+### `checkSaveAsPathOptions(options): true`
 
-Checksums will be generated only when template uses them.
+A **synchronous** function that checks if template in options is not trying to use non-existent variables, or has any syntax or runtime errors.
 
-When you are passing `outputPath`, it means you are running `saveAsPath()` **after** the file has been generated, in which case it's a good practice to use `checkTemplate()` below to check if a template will produce a path and not error out due to syntax errors or misspelled variables. We don't want to spend 30 minutes encoding a file, and only then error out because template has errors.
+This is so that invalid options throw an error BEFORE we potentially spend half an hour creating a new file, and not afterwards.
 
-Also, don't forget to enable `makeOptionsSchema({showChecksums: true})` so people can see checksums available in template description.
+```js
+checkSaveAsPathOptions(payload.options.saving);
+```
+
+#### `options`
+
+Type: `SaveAsPathOptions` _required_
+
+```ts
+interface SaveAsPathOptions {
+	destination?: string;
+	deleteOriginal?: boolean;
+	overwriteDestination?: boolean;
+	incrementer?: 'space' | 'dash' | 'underscore' | 'parentheses';
+	extraVariables?: Record<string, any>;
+}
+```
 
 #### Returns
 
-Promise that resolves with desired output file path.
-
-### `checkTemplate(originalPath: string, outputExtension: string, options: SaveAsPathOptions): true`
-
-A **synchronous** function that checks if template in options is
-
-```js
-const destinationPath = await saveAsPath(payload.input.path, 'webp', payload.options.saving);
-```
+Returns `true` if options look all right, or throws `TemplateError` with message of what is wrong with them.
 
 ### TemplateError
 
