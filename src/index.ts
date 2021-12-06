@@ -75,13 +75,13 @@ export function makeOptionSchema({extraVariables = {}}: MakeOptionSchemaOptions 
 						.join('<br>')}
 				</p>
 				<p>
-					Platform folders: <b><code>\${tmp}</code></b>, <b><code>\${home}</code></b>, <b><code>\${downloads}</code></b>, <b><code>\${documents}</code></b>, <b><code>\${pictures}</code></b>, <b><code>\${music}</code></b>, <b><code>\${videos}</code></b>, <b><code>\${desktop}</code></b>
+					Platform folders:<br>
+					<b><code>\${tmp}</code></b>, <b><code>\${home}</code></b>, <b><code>\${downloads}</code></b>, <b><code>\${documents}</code></b>, <b><code>\${pictures}</code></b>, <b><code>\${music}</code></b>, <b><code>\${videos}</code></b>, <b><code>\${desktop}</code></b>
 				</p>
-				<p><b>Utils:</b></p>
 				<p>
-					<b><code>Path</code></b> - <a href="https://nodejs.org/api/path.html">Node.js' <code>path</code> module</a>.<br>
-					<b><code>time()</code></b> - <a href="https://day.js.org/docs/en/display/format">day.js</a>.<br>
-					<b><code>uid(size? = 10)</code></b> - Unique string generator. Size is optional, default is 10. This is a faster alternative to generating file checksums when uniqueness is all that is desired. Example: <code>${uid()}</code><br>
+					Utils:<br>
+					<b><code>time()</code></b> - <a href="https://day.js.org/docs/en/display/format">day.js</a> util to help with time. Example: <code>\${time().format('YY')}</code><br>
+					<b><code>uid(size? = 10)</code></b> - Unique string generator. Size is optional, default is 10. This is a faster alternative to generating file checksums when uniqueness is all that is desired. Example: <code>\${uid()}</code><br>
 				</p>
 				`,
 			},
