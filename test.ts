@@ -274,3 +274,21 @@ test('saveAsPath() generates checksums', async (t) => {
 		t.is(await saveAsPath(fp('new.txt'), fp('tmpfile'), 'jpg', o(`\${${ucName}}`)), fp(ucHash), `${ucName} check`);
 	}
 });
+
+test(`saveAsPath() triggers onOutputPath before it's done`, async (t) => {
+	const {setup, getFixturePath: fp} = createFixtures();
+	let outputPath: undefined | string;
+
+	await setup(['tmpfile']);
+	const result = await saveAsPath(
+		fp('new.txt'),
+		fp('tmpfile'),
+		'jpg',
+		o('foo', {
+			onOutputPath: (newPath) => {
+				outputPath = newPath;
+			},
+		})
+	);
+	t.is(result, outputPath);
+});

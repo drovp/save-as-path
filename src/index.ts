@@ -18,6 +18,7 @@ export interface SaveAsPathOptions {
 	overwriteDestination?: boolean;
 	incrementer?: 'space' | 'dash' | 'underscore' | 'parentheses';
 	extraVariables?: Record<string, any>;
+	onOutputPath?: (outputPath: string) => void;
 }
 
 export interface Options {
@@ -162,6 +163,8 @@ export async function saveAsPath(
 		inputDirname,
 		expandTemplate(inputPath, outputExtension, {...options, destination: template, extraVariables})
 	);
+
+	options.onOutputPath?.(outputPath);
 
 	const samePath = isSamePath(outputPath, inputPath);
 

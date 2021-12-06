@@ -189,6 +189,7 @@ interface SaveAsPathOptions {
 	overwriteDestination?: boolean;
 	incrementer?: 'space' | 'dash' | 'underscore' | 'parentheses';
 	extraVariables?: Record<string, any>;
+	onOutputPath?: (outputPath: string) => void;
 }
 ```
 
@@ -273,6 +274,12 @@ const outputPath = await saveAsPath(input.path, tmpPath, 'jpg', {
 });
 ```
 
+##### `onOutputPath`
+
+Type: `(outputPath: string) => void` _optional_
+
+An event triggered right after the `outputPath` has been determined. Sometimes, new path might be on a different partition/drive than the temporary file, and if the file is big, it'll take a second to transfer, but you might want to log that this operation is happening before it starts.
+
 #### Returns
 
 Promise that resolves with output file path.
@@ -291,15 +298,7 @@ checkSaveAsPathOptions(payload.options.saving);
 
 Type: `SaveAsPathOptions` _required_
 
-```ts
-interface SaveAsPathOptions {
-	destination?: string;
-	deleteOriginal?: boolean;
-	overwriteDestination?: boolean;
-	incrementer?: 'space' | 'dash' | 'underscore' | 'parentheses';
-	extraVariables?: Record<string, any>;
-}
-```
+Same options you intend to pass to `saveAsPath()` later.
 
 #### Returns
 
