@@ -1,10 +1,12 @@
 # @drovp/save-as-path
 
-[Drovp](https://drovp.app) plugin utility to determine destination path for file results. Also comes with option schema to easily plugin into your processor's profile options.
+[Drovp](https://drovp.app) plugin utility to help plugins provide users with powerful output path determination interface. Also comes with option schema to easily plugin into your processor's profile options.
 
 ### Features
 
-Destination as a string template with embedded expressions support (JavaScript template literals), and lot of available variables, such as all of the file path parts like `${basename}`, `${filename}`, `${extension}`, ... as well as common platform folder paths like `${downloads}`, `${documents}`, `${pictures}`, ...
+Destination option is a string template with embedded expressions support (JavaScript template literals), with access to a lot of useful variables, such as all of the file path parts like `${basename}`, `${filename}`, `${extension}`, ... as well as common platform folder paths like `${downloads}`, `${documents}`, `${pictures}`, ..., and output file checksums `${crc32}`, `${md5}`, ...
+
+You can also extend the available variables with extra ones. You can even pass functions or other utilities.
 
 Separate options to **Delete original** file and **Overwrite destination** (only or even if it's a different file than original), so that the saving destination is generated exactly to user's needs.
 
@@ -18,10 +20,10 @@ npm install @drovp/save-as-path
 
 ## Usage
 
-In main file, make and add options to your processor:
+In main file, make and add save-as-path option namespace item to your processor options schema:
 
 ```js
-// index.js
+// Main plugin file (index.js)
 const {makeOptionSchema} = require('@drovp/save-as-path');
 
 module.exports = (plugin) => {
@@ -35,9 +37,7 @@ module.exports = (plugin) => {
 };
 ```
 
-This will add `saving` namespace to your profile options, ready to be passed to `saveAsPath()` to handle all the tedious renaming related stuff for you.
-
-Here's a best practice example of how to use this utility:
+This will add `saving` namespace to your profile options, ready to be passed to `saveAsPath()` inside your processor to handle all the tedious renaming related stuff for you:
 
 ```js
 // processor.js
@@ -126,7 +126,7 @@ plugin.registerProcessor('foo', {
 
 #### `options`
 
-Exported as `MakeOptionSchemaOptions`.
+Type: `MakeOptionSchemaOptions`
 
 ```ts
 interface MakeOptionSchemaOptions {
@@ -307,4 +307,4 @@ Returns `true` if options look all right, or throws `TemplateError` with message
 
 ### TemplateError
 
-Error thrown when template tries to use a non-existent variable, or has syntax or runtime errors.
+Error thrown when template tries to use a non-existent variable, or has a syntax or runtime errors.
