@@ -148,17 +148,13 @@ export async function saveAsPath(
 		if (template.includes(name)) extraVariables[name] = await platformPaths[name]();
 	}
 
-	// Query needed platform paths
-	for (const name of Object.keys(platformPaths) as (keyof typeof platformPaths)[]) {
-		if (template.includes(name)) extraVariables[name] = await platformPaths[name]();
-	}
-
 	// Generate checksums used in a template
 	const lcTemplate = template.toLowerCase();
 	for (const name of ['crc32', 'md5', 'sha1', 'sha256', 'sha512']) {
 		if (lcTemplate.includes(name)) {
 			const checksum = await checksumFile(tmpPath, name);
-			extraVariables[name] = extraVariables[name.toUpperCase()] = checksum;
+			extraVariables[name] = checksum;
+			extraVariables[name.toUpperCase()] = checksum.toUpperCase();
 		}
 	}
 

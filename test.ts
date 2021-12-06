@@ -257,30 +257,20 @@ test('saveAsPath() expands platform folders', async (t) => {
 
 test('saveAsPath() generates checksums', async (t) => {
 	const {setup, getFixturePath: fp} = createFixtures();
+	const fooHashes = {
+		crc32: '8c736521',
+		md5: 'acbd18db4cc2f85cedef654fccc4a4d8',
+		sha1: '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+		sha256: '2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae',
+		sha512: 'f7fbba6e0636f890e56fbbf3283e524c6fa3204ae298382d624741d0dc6638326e282c41be5e4254d8820772c5518a2c5a8c0c7f7eda19594a7eb539453e1ed7',
+	};
 
-	await setup({tmpfile: 'foo'});
-	t.is(await saveAsPath(fp('new.txt'), fp('tmpfile'), 'jpg', o('${crc32}')), fp('8c736521'));
-
-	await setup({tmpfile: 'foo'});
-	t.is(await saveAsPath(fp('new.txt'), fp('tmpfile'), 'jpg', o('${md5}')), fp('acbd18db4cc2f85cedef654fccc4a4d8'));
-
-	await setup({tmpfile: 'foo'});
-	t.is(
-		await saveAsPath(fp('new.txt'), fp('tmpfile'), 'jpg', o('${sha1}')),
-		fp('0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33')
-	);
-
-	await setup({tmpfile: 'foo'});
-	t.is(
-		await saveAsPath(fp('new.txt'), fp('tmpfile'), 'jpg', o('${sha256}')),
-		fp('2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae')
-	);
-
-	await setup({tmpfile: 'foo'});
-	t.is(
-		await saveAsPath(fp('new.txt'), fp('tmpfile'), 'jpg', o('${sha512}')),
-		fp(
-			'f7fbba6e0636f890e56fbbf3283e524c6fa3204ae298382d624741d0dc6638326e282c41be5e4254d8820772c5518a2c5a8c0c7f7eda19594a7eb539453e1ed7'
-		)
-	);
+	for (const [name, hash] of Object.entries(fooHashes)) {
+		const ucName = name.toUpperCase();
+		const ucHash = hash.toUpperCase();
+		await setup({tmpfile: 'foo'});
+		t.is(await saveAsPath(fp('new.txt'), fp('tmpfile'), 'jpg', o(`\${${name}}`)), fp(hash), `${name} check`);
+		await setup({tmpfile: 'foo'});
+		t.is(await saveAsPath(fp('new.txt'), fp('tmpfile'), 'jpg', o(`\${${ucName}}`)), fp(ucHash), `${ucName} check`);
+	}
 });
