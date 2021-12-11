@@ -57,6 +57,8 @@ export function makeOptionSchema({extraVariables = {}}: MakeOptionSchemaOptions 
 				kind: 'directory',
 				default: '${basename}',
 				title: `Destination`,
+				// Appends old filename template to a newly selected directory
+				formatSelection: formatDestinationSelection,
 				description: `
 				<p>Where to save the file. Relative path starts at the input file's directory. Template is a JavaScript template literal allowing embedded expressions.</p>
 				<p><b>Available variables:</b></p>
@@ -287,3 +289,9 @@ export const uid = (size = 10) =>
 		.fill(0)
 		.map(() => Math.floor(Math.random() * 36).toString(36))
 		.join('');
+
+function formatDestinationSelection(path: string, oldPath: string) {
+	const oldPathParts = (oldPath || '').split(/\\|\//);
+	const lastOldPathPart = oldPathParts[oldPathParts.length - 1]!;
+	return Path.join(path, lastOldPathPart);
+}
