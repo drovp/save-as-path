@@ -166,8 +166,6 @@ export async function saveAsPath(
 		expandTemplate(inputPath, outputExtension, {...options, destination: template, extraVariables})
 	);
 
-	options.onOutputPath?.(outputPath);
-
 	const samePath = isSamePath(outputPath, inputPath);
 
 	// Increment filename to satisfy both deleteOriginal and overwriteDestination options
@@ -191,6 +189,9 @@ export async function saveAsPath(
 			}
 		}
 	}
+
+	// Notify that the final path has been determined
+	options.onOutputPath?.(outputPath);
 
 	// Delete input when options ask for it
 	if (deleteOriginal) await FSP.rm(inputPath, {force: true});
