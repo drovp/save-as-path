@@ -219,8 +219,8 @@ _Examples assume **inputPath** `/foo/bar/baz.png` and **outputExtension** `jpg`.
 -   **`${CRC32/MD5/SHA1/SHA256/SHA512}`** - uppercase **output** file checksums
 -   Platform folders: **`${tmp}`**, **`${home}`**, **`${downloads}`**, **`${documents}`**, **`${pictures}`**, **`${music}`**, **`${videos}`**, **`${desktop}`**
 -   Utilities:
-    -   **`time()`** - [day.js](https://day.js.org/docs/en/display/format) util to help with time. Example: `${time().format('YY')}`
-    -   **`uid(size? = 10)`** - unique string generator, size is optional, default is 10. Example: `${uid()}`
+    -   **`Time()`** - [day.js](https://day.js.org/docs/en/display/format) util to help with time. Example: `${Time().format('YY')}`
+    -   **`UID(size? = 10)`** - unique string generator, size is optional, default is 10. Example: `${UID()}`
 
 You can add more variables with `extraVariables` option below.
 

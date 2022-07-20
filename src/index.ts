@@ -262,8 +262,8 @@ function expandTemplate(
 		extname,
 		basename,
 		dirbasename: Path.basename(dirname),
-		time: dayjs,
-		uid,
+		Time: dayjs,
+		UID,
 		...extraVariables,
 	};
 
@@ -285,7 +285,7 @@ function isSamePath(pathA: string, pathB: string) {
 	return normalizePath(pathA) === normalizePath(pathB);
 }
 
-export const uid = (size = 10) =>
+export const UID = (size = 10) =>
 	Array(size)
 		.fill(0)
 		.map(() => Math.floor(Math.random() * 36).toString(36))
