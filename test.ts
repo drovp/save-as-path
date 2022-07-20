@@ -87,12 +87,12 @@ test('checkSaveAsPathOptions() uses extra variables', async (t) => {
 
 test('checkSaveAsPathOptions() throws on missing variables', async (t) => {
 	const error = t.throws(() => checkSaveAsPathOptions(o('${foo}')), {instanceOf: TemplateError});
-	t.is(error.message, 'foo is not defined');
+	t.is(error?.message, 'foo is not defined');
 });
 
 test('checkSaveAsPathOptions() throws on syntax errors', async (t) => {
 	const error = t.throws(() => checkSaveAsPathOptions(o('${.basename}')), {instanceOf: TemplateError});
-	t.is(error.message, `Unexpected token '.'`);
+	t.is(error?.message, `Unexpected token '.'`);
 });
 
 test(`saveAsPath() throws when tmpPath doesn't exist`, async (t) => {
@@ -277,7 +277,7 @@ test('saveAsPath() generates checksums', async (t) => {
 
 test(`saveAsPath() triggers onOutputPath before it's done`, async (t) => {
 	const {setup, getFixturePath: fp} = createFixtures();
-	let outputPath: undefined | string;
+	let outputPath: string = '';
 
 	await setup(['tmpfile']);
 	const result = await saveAsPath(
