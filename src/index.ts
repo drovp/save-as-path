@@ -82,8 +82,8 @@ export function makeOptionSchema({extraVariables = {}}: MakeOptionSchemaOptions 
 				</p>
 				<p>
 					Utils:<br>
-					<b><code>time()</code></b> - <a href="https://day.js.org/docs/en/display/format">day.js</a> util to help with time. Example: <code>\${time().format('YY')}</code><br>
-					<b><code>uid(size? = 10)</code></b> - Unique string generator. Size is optional, default is 10. This is a faster alternative to generating file checksums when uniqueness is all that is desired. Example: <code>\${uid()}</code><br>
+					<b><code>Time()</code></b> - <a href="https://day.js.org/docs/en/display/format">day.js</a> util to help with time. Example: <code>\${Time().format('YY')}</code><br>
+					<b><code>UID(size? = 10)</code></b> - Unique string generator. Size is optional, default is 10. This is a faster alternative to generating file checksums when uniqueness is all that is desired. Example: <code>\${UID()}</code><br>
 				</p>
 				`,
 			},
