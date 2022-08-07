@@ -297,5 +297,5 @@ export const UID = (size = 10) =>
 function formatDestinationSelection(path: string, oldPath: string) {
 	const oldPathParts = (oldPath || '').split(/\\|\//);
 	const lastOldPathPart = oldPathParts[oldPathParts.length - 1]!;
-	return Path.posix.join(path.replace('\\', '/'), lastOldPathPart);
+	return Path.posix.join(path.replaceAll('\\', '/'), lastOldPathPart);
 }
