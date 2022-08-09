@@ -220,7 +220,7 @@ _Examples assume **inputPath** `/foo/bar/baz.png` and **outputExtension** `jpg`.
 -   Platform folders: **`${tmp}`**, **`${home}`**, **`${downloads}`**, **`${documents}`**, **`${pictures}`**, **`${music}`**, **`${videos}`**, **`${desktop}`**
 -   Utilities:
     -   **`Time()`** - [day.js](https://day.js.org/docs/en/display/format) util to help with time. Example: `${Time().format('YY')}`
-    -   **`UID(size? = 10)`** - unique string generator, size is optional, default is 10. Example: `${UID()}`
+    -   **`uid(size? = 10)`** - unique string generator, size is optional, default is 10. Example: `${uid()}`
 
 You can add more variables with `extraVariables` option below.
 

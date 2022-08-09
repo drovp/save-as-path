@@ -83,7 +83,7 @@ export function makeOptionSchema({extraVariables = {}}: MakeOptionSchemaOptions 
 				<p>
 					Utils:<br>
 					<b><code>Time()</code></b> - <a href="https://day.js.org/docs/en/display/format">day.js</a> util to help with time. Example: <code>\${Time().format('YY')}</code><br>
-					<b><code>UID(size? = 10)</code></b> - Unique string generator. Size is optional, default is 10. This is a faster alternative to generating file checksums when uniqueness is all that is desired. Example: <code>\${UID()}</code><br>
+					<b><code>uid(size? = 10)</code></b> - Unique string generator. Size is optional, default is 10. This is a faster alternative to generating file checksums when uniqueness is all that is desired. Example: <code>\${uid()}</code><br>
 				</p>
 				<p>
 					<b>NOTE</b>: Do NOT use backslashes (<code>\\</code>) in paths. It produces cross-platform incompatible paths (can't share profile import codes) and leads to escaping issues.
@@ -266,7 +266,7 @@ function expandTemplate(
 		basename,
 		dirbasename: Path.basename(dirname),
 		Time: dayjs,
-		UID,
+		uid,
 		...extraVariables,
 	};
 
@@ -288,7 +288,7 @@ function isSamePath(pathA: string, pathB: string) {
 	return normalizePath(pathA) === normalizePath(pathB);
 }
 
-export const UID = (size = 10) =>
+export const uid = (size = 10) =>
 	Array(size)
 		.fill(0)
 		.map(() => Math.floor(Math.random() * 36).toString(36))
