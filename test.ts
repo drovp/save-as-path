@@ -233,11 +233,11 @@ test('saveAsPath() provides Time() util', async (t) => {
 	);
 });
 
-test('saveAsPath() provides UID() util', async (t) => {
+test('saveAsPath() provides uid() util', async (t) => {
 	const {setup, getFixturePath: fp} = createFixtures();
 	const extraOptions = {extraVariables: {foo: () => 'bar'}};
 	await setup(['tmpfile']);
-	t.regex(await saveAsPath(fp('new.txt'), fp('tmpfile'), 'jpg', o('${UID(1)}', extraOptions)), /(\\|\/)\w$/);
+	t.regex(await saveAsPath(fp('new.txt'), fp('tmpfile'), 'jpg', o('${uid(1)}', extraOptions)), /(\\|\/)\w$/);
 });
 
 test('saveAsPath() expands platform folders', async (t) => {
