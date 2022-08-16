@@ -110,7 +110,11 @@ interface Options {
 }
 ```
 
-### `makeOptionSchema(options?): OptionNamespace`
+### makeOptionSchema
+
+```ts
+makeOptionSchema(options?: MakeOptionSchemaOptions): OptionNamespace
+```
 
 A function to construct `saving` namespace option item schema. Example:
 
@@ -150,7 +154,11 @@ makeOptionsSchema({
 });
 ```
 
-### `saveAsPath(inputPath, tmpPath, outputExtension, options?): Promise<string>`
+### saveAsPath
+
+```ts
+saveAsPath(inputPath: string | string[], tmpPath: string, outputExtension: string, options?): Promise<string>;
+```
 
 An async function that determines the final file destination, and handles all the renaming, deleting, or copying between partitions/drives. Example:
 
@@ -160,11 +168,13 @@ const outputPath = await saveAsPath(payload.input.path, 'tmpfile1e44', 'webp', p
 
 #### `inputPath`
 
-Type: `string` _required_
+Type: `string | string[]` _required_
 
 Path to the original file that has been processed. This path doesn't have to exist anymore, `saveAsPath()` only uses it to extract path related variables to be used in a template.
 
 Though when **deleteOriginal** option is enabled, `saveAsPath()` will ensure it's deleted before renaming or deciding the new file name.
+
+You can also pass an array of paths in case they were all used to construct the final finale at `tmpPath` (i.e. concatenating videos). In this case the first one is going to be used as seed for the template, and the rest ignored, but still deleted when `deleteOriginal` is enabled.
 
 #### `tmpPath`
 
@@ -284,7 +294,11 @@ An event triggered right after the `outputPath` has been determined. Sometimes, 
 
 Promise that resolves with output file path.
 
-### `checkSaveAsPathOptions(options): true`
+### checkSaveAsPathOptions
+
+```ts
+checkSaveAsPathOptions(options: SaveAsPathOptions): true
+```
 
 A **synchronous** function that checks if template in options is not trying to use non-existent variables, or has any syntax or runtime errors.
 

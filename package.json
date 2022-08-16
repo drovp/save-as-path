@@ -55,7 +55,6 @@
 		"@tomasklaen/checksum": "^1.1.0",
 		"dayjs": "^1.11.4",
 		"expand-template-literal": "^1.0.3",
-		"platform-paths": "^1.2.2",
-		"unused-filename": "^3.0.1"
+		"platform-paths": "^1.2.2"
 	}
 }

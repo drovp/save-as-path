@@ -255,6 +255,25 @@ test('saveAsPath() expands platform folders', async (t) => {
 	);
 });
 
+test('saveAsPath() accepts an array of inputs', async (t) => {
+	const {setup, getFixturePath: fp} = createFixtures();
+	await setup(['tmpfile']);
+	t.is(await saveAsPath([fp('old.txt'), fp('old2.txt')], fp('tmpfile'), 'txt', o(`new.txt`)), fp('new.txt'));
+});
+
+test('saveAsPath() checks the whole array of inputs for original', async (t) => {
+	const {setup, getFixturePath: fp} = createFixtures();
+	await setup(['tmpfile', 'new.txt', 'new 1.txt', 'new 2.txt']);
+	t.is(await saveAsPath([fp('new.txt'), fp('new 1.txt')], fp('tmpfile'), 'txt', o(`new.txt:o`)), fp('new 2.txt'));
+});
+
+test('saveAsPath() deletes all input paths when requested', async (t) => {
+	const {setup, getFixturePath: fp, list} = createFixtures();
+	await setup(['tmpfile', 'old.txt', 'old 1.txt']);
+	t.is(await saveAsPath([fp('old.txt'), fp('old 1.txt')], fp('tmpfile'), 'txt', o(`new.txt:d`)), fp('new.txt'));
+	t.deepEqual(await list(), ['new.txt']);
+});
+
 test('saveAsPath() generates checksums', async (t) => {
 	const {setup, getFixturePath: fp} = createFixtures();
 	const fooHashes = {
